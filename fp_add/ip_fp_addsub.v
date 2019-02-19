@@ -41,7 +41,9 @@ module ip_fp_addsub
     wire [$clog2(P_PFRAC+1)-1:0] c_lzc_cap;
 
     // Far path signals
-    wire [2*P_PFRAC+2-1:0]   f_s_frac_shift;
+    wire [P_PFRAC+3-1:0]     f_s_frac_shift;
+    wire [P_PFRAC+3-1:0]     f_s_frac_shift_comp;
+    wire [P_PFRAC+3-1:0]     f_s_frac_shift_mux;
     wire [P_PFRAC-1:0]       f_s_frac;
     wire                     f_g_bit;
     wire                     f_r_bit;
@@ -128,15 +130,17 @@ module ip_fp_addsub
     //
 
     // Shift smaller number by the exp delta
-    assign f_s_frac_shift = {s_frac,2'b0,{P_PFRAC{1'b0}}} >> ls_exp;
+    assign f_s_frac_shift      = shift_right(s_frac,ls_exp);
+    assign f_s_frac_shift_comp = ~f_s_frac_shift + 1;
+    assign f_s_frac_shift_mux  = eff_sub ? f_s_frac_shift_comp : f_s_frac_shift;
     // Split f_s_frac_shift into 3 parts:
-    assign f_s_frac = f_s_frac_shift[2*P_PFRAC+2-1:P_PFRAC+2];
-    assign f_g_bit  = f_s_frac_shift[P_PFRAC+1];
-    assign f_r_bit  = f_s_frac_shift[P_PFRAC];
-    assign f_s_bit  = |f_s_frac_shift[P_PFRAC-1:0];
+    assign f_s_frac = f_s_frac_shift_mux[P_PFRAC+3-1:3];
+    assign f_g_bit  = f_s_frac_shift_mux[2];
+    assign f_r_bit  = f_s_frac_shift_mux[1];
+    assign f_s_bit  = f_s_frac_shift_mux[0];
 
     // Add or sub the two fracions
-    assign f_subadd_frac = eff_sub == 1'b0 ? l_frac + f_s_frac : l_frac - f_s_frac;
+    assign f_subadd_frac = {1'b0,l_frac} + {eff_sub && f_s_frac[P_PFRAC-1],f_s_frac};
 
     // Prenorm step
     always @(*) begin
@@ -155,7 +159,7 @@ module ip_fp_addsub
             end
             2'b00: begin
                 //It was Substraction that lead at one bit cancellation
-                f_z_exp    = l_exp + 1;
+                f_z_exp    = l_exp - 1;
                 f_z_frac   = {f_subadd_frac[P_PFRAC-2:0], f_g_bit, f_r_bit};
                 f_z_sticky = f_s_bit;
             end
@@ -209,6 +213,21 @@ module ip_fp_addsub
     /////////////////////////////////////////////
     /// Functions
     /////////////////////////////////////////////
+
+    function [P_PFRAC-1+3:0] shift_right;
+        input [P_PFRAC-1:0] din;
+        input [P_EXP-1:0]   lft;
+        reg [P_PFRAC-1+3:0] tmp;
+        reg                 fln_off;
+        begin
+            tmp = {din, 3'b000};
+            for (int i=0; i<lft; i++) begin
+                {tmp, fln_off} = tmp;
+                tmp = tmp | fln_off;
+            end    
+            shift_right = tmp;
+        end
+    endfunction
 
     function [$clog2(P_PFRAC+1)-1:0] lzc;
         input [P_PFRAC:0] x;

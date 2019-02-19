@@ -205,19 +205,20 @@ module top;
         sr = sr * tmp;
     //    $display("CINO exps = %d, tmp = %e", exps, tmp);
 
-        mybitstoreal = bits == 0 ? 0.0 : exp == {P_EXP{1'b1}} ? 'x : sign ? -1.0 * sr : sr;
+        mybitstoreal = bits == 0 ? 0.0 : 
+                       exp == {P_EXP{1'b1}} ? (sign ? $ln(0.0) : 1.0/0.0) : sign ? -1.0 * sr : sr;
     //    $display("CINO mybitstoreal = %2.30e, sr = %e, exp = %0d", mybitstoreal, sr, exp);
     endfunction
 
     function [P_WORD-1:0] myrealtobits;
         input real r;
-
         reg sign;
         reg [P_EXP-1:0] exp;
         reg [P_FRAC-1:0] frac;
         integer iexp;
         real abs, ffrac, ffracd;
 
+//        $display("CINO myrealtobits: r = %2.30e", r);
         sign  = r < 0.0 ? 1 : 0;
         abs   = sign ? -1.0*r : r;
         iexp  = $floor($ln(abs) / $ln(2));
@@ -236,8 +237,13 @@ module top;
             exp  = 0;
             frac = ffracd * (2**(P_FRAC-1));
         end
-        // $display("CINO sign = %b, exp = %0h, ffrac = %0h",sign,exp,frac);
-        myrealtobits = {sign, exp, frac};
+//        $display("CINO myrealtobits sign = %b, exp = %0h, ffrac = %0h",sign,exp,frac);
+        if (r == 1.0/0.0) 
+            myrealtobits = 1.0/0.0;
+        else if (r == $ln(0.0)) 
+            myrealtobits = $ln(0.0);
+        else
+            myrealtobits = {sign, exp, frac};
 
     endfunction
 
