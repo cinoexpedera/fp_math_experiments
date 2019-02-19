@@ -59,7 +59,7 @@ module ip_fp_addsub
     reg                      cf_z_sign;
     reg                      cf_z_sticky;
 
-    wire [2:0]               grs;
+    wire [1:0]               rs;
     wire [P_EXP+P_FRAC-1:0]  z_exp_frac;
     reg [P_EXP+P_FRAC-1:0]   z_exp_frac_rnd;
 
@@ -187,14 +187,14 @@ module ip_fp_addsub
 
     // Now rounding and normilized the final Result
     assign z_exp_frac     = {cf_z_exp, cf_z_frac[P_PFRAC-1:1]};
-    assign grs            = {cf_z_frac[1], cf_z_frac[0],cf_z_sticky};
+    assign rs            = {cf_z_frac[0],cf_z_sticky};
     always @(*) begin
-        if (grs[1:0] == 2'b11) begin
+        if (rs[1:0] == 2'b11) begin
             // Round Up
          //   $display("Rounding up");
             z_exp_frac_rnd = z_exp_frac + 1;
         end
-        else if (grs == 3'b110) begin
+        else if (rs == 3'b10) begin
             // tie EVEN only
          //   $display("Tie Rounding up/down");
             z_exp_frac_rnd = z_exp_frac[2] == 1'b1 ? z_exp_frac + 1 : z_exp_frac;
@@ -224,7 +224,7 @@ module ip_fp_addsub
             for (int i=0; i<lft; i++) begin
                 {tmp, fln_off} = tmp;
                 tmp = tmp | fln_off;
-            end    
+            end
             shift_right = tmp;
         end
     endfunction
