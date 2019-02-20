@@ -79,19 +79,19 @@ module ip_fp_addsub
     always @(*) begin
         if (a_exp >= b_exp) begin
             l_sign  = a_sign;
-            l_exp   = a_exp;
-            l_frac  = a_exp == 'd0 ? {1'b0, a_frac} : {1'b1, a_frac};
+            l_exp   = a_exp + (a_exp == 'd0);
+            l_frac  = {|a_exp, a_frac};
             s_sign  = b_sign;
-            s_exp   = b_exp;
-            s_frac  = b_exp == 'd0 ? {1'b0, b_frac} : {1'b1, b_frac};
+            s_exp   = b_exp + (b_exp == 'd0);
+            s_frac  = {|b_exp, b_frac};
         end
         else begin
             l_sign  = b_sign;
-            l_exp   = b_exp;
-            l_frac  = b_exp == 'd0 ? {1'b0, b_frac} : {1'b1, b_frac};
+            l_exp   = b_exp + (b_exp == '0);
+            l_frac  = {|b_exp, b_frac};
             s_sign  = a_sign;
-            s_exp   = a_exp;
-            s_frac  = a_exp == 'd0 ? {1'b0, a_frac} : {1'b1, a_frac};
+            s_exp   = a_exp + (a_exp == '0);
+            s_frac  = {|a_exp, a_frac};
         end
     end
 
@@ -194,10 +194,10 @@ module ip_fp_addsub
          //   $display("Rounding up");
             z_exp_frac_rnd = z_exp_frac + 1;
         end
-        else if (rs == 3'b10) begin
+        else if (rs == 2'b10) begin
             // tie EVEN only
          //   $display("Tie Rounding up/down");
-            z_exp_frac_rnd = z_exp_frac[2] == 1'b1 ? z_exp_frac + 1 : z_exp_frac;
+            z_exp_frac_rnd = cf_z_frac[1] == 1'b1 ? z_exp_frac + 1 : z_exp_frac;
         end
         else begin
             // Round down
