@@ -31,7 +31,7 @@ module ip_fp_addsub
     wire [P_EXP-1:0]  ls_exp;  // alwys positive so no need to sign extend
     // Close path signals
     wire [P_PFRAC:0]       c_s_frac_shift;
-    wire [P_PFRAC:0]       c_ls_frac, c_ls_frac0, c_ls_frac1;
+    wire [P_PFRAC+1:0]     c_ls_frac, c_ls_frac0, c_ls_frac1;
     wire                   c_ls_frac_sign;
     wire [P_EXP-1:0]       c_z_exp;
     wire [P_PFRAC:0]       c_z_frac;
@@ -79,24 +79,24 @@ module ip_fp_addsub
     always @(*) begin
         if (a_exp >= b_exp) begin
             l_sign  = a_sign;
-            l_exp   = a_exp + (a_exp == 'd0);
+            l_exp   = a_exp;
             l_frac  = {|a_exp, a_frac};
             s_sign  = b_sign;
-            s_exp   = b_exp + (b_exp == 'd0);
+            s_exp   = b_exp;
             s_frac  = {|b_exp, b_frac};
         end
         else begin
             l_sign  = b_sign;
-            l_exp   = b_exp + (b_exp == '0);
+            l_exp   = b_exp;
             l_frac  = {|b_exp, b_frac};
             s_sign  = a_sign;
-            s_exp   = a_exp + (a_exp == '0);
+            s_exp   = a_exp;
             s_frac  = {|a_exp, a_frac};
         end
     end
 
     // calculate delta exp it will always positive
-    assign ls_exp = l_exp - s_exp;
+    assign ls_exp = l_exp - |l_exp - s_exp + |s_exp;
 
     // Decide if we use the close or the far path
     assign c_path = eff_sub && ((l_exp == s_exp) || (ls_exp == 'd1));
@@ -110,7 +110,7 @@ module ip_fp_addsub
     // Sub the two farc numbers in both comb l - s and s -l
     assign c_ls_frac0      = {l_frac, 1'b0} - c_s_frac_shift;
     assign c_ls_frac1      = c_s_frac_shift - {l_frac, 1'b0};
-    assign c_ls_frac_sign  = c_ls_frac0[P_PFRAC] == 1'b1;
+    assign c_ls_frac_sign  = c_ls_frac0[P_PFRAC+1] == 1'b1;
     // Pick the correct one
     assign c_ls_frac       = c_ls_frac_sign == 1'b0 ? c_ls_frac0 : c_ls_frac1;
     // Calculate how many 0s need to be canceled out
@@ -152,13 +152,14 @@ module ip_fp_addsub
                 f_z_sticky = f_g_bit || f_r_bit || f_s_bit;
             end
             2'b01: begin
-                // Addition carry out is not set: no shift is required
+                // Addition carry out is not set: no shift is required, normal case
                 f_z_exp    = l_exp;
                 f_z_frac   = {f_subadd_frac[P_PFRAC-1:0], f_g_bit};
                 f_z_sticky = f_r_bit || f_s_bit;
             end
             2'b00: begin
                 //It was Substraction that lead at one bit cancellation
+                // or result is denorm
                 f_z_exp    = l_exp - 1;
                 f_z_frac   = {f_subadd_frac[P_PFRAC-2:0], f_g_bit, f_r_bit};
                 f_z_sticky = f_s_bit;
@@ -189,7 +190,12 @@ module ip_fp_addsub
     assign z_exp_frac     = {cf_z_exp, cf_z_frac[P_PFRAC-1:1]};
     assign rs            = {cf_z_frac[0],cf_z_sticky};
     always @(*) begin
-        if (rs[1:0] == 2'b11) begin
+        if (l_exp == {P_EXP{1'b1}} || s_exp == {P_EXP{1'b1}}) begin
+            // Inputs were Infinite and/or NaN
+            // Still TODO
+            z_exp_frac_rnd = {{P_EXP{1'b1}},{P_FRAC{1'b0}}};
+        end
+        else if (rs[1:0] == 2'b11) begin
             // Round Up
          //   $display("Rounding up");
             z_exp_frac_rnd = z_exp_frac + 1;

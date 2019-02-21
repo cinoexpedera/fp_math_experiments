@@ -4,4 +4,4 @@ if ( $status > 0 ) then
     echo "Aborted go and debug above it"
     exit 1
 endif
-vvp -l sim.log tb_exe -fst +transaction=100
+vvp -l sim.log tb_exe -fst +transaction=100000

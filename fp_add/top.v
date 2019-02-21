@@ -24,6 +24,7 @@ module top;
     reg                 op;
     real                x,y,k;
     reg                 x_vld, y_vld;
+    reg                 fail;
 
     assign #2 clk = clk === 0;
 
@@ -46,6 +47,7 @@ module top;
 
         rnd = 0;
         op  = 1'b0;
+        fail = 1'b0;
 
        `ifdef ICS
         $display("\nHELLO IICS\n");
@@ -114,7 +116,7 @@ module top;
 
         a = {1'b1,5'b10000, 10'b0100000000};
         b = {1'b0,5'b10000, 10'b1000000000};
-        for (i = 0; i < 1000; i++) begin
+        for (i = 0; i < transaction; i++) begin
             a = $urandom();
             b = $urandom();
             x = mybitstoreal(a);
@@ -126,6 +128,7 @@ module top;
             end
             else begin
                 $display("%t sample %d ERROR they don't match: a = 0x%0h:%2.20e; b = 0x%0h:%2.20e; z = 0x%0h:%2.20e, expt = 0x%0h:%2.20e",$time,i,a,x,b,y,z,mybitstoreal(z),myrealtobits(k),k);
+                fail = 1'b1;
             end
         end
         // start_push = 1;
@@ -135,9 +138,14 @@ module top;
         // end
 
         repeat (500) @(posedge clk);
-        $display("======================================");
-        $display("=       TEST COMPLETED                ");
-        $display("======================================");
+        $display("==============================================");
+        if (fail) begin
+            $display("=       TEST FAILED: go and debug it!        =");
+        end
+        else begin
+            $display("=       TEST PASSS!!!!!!!                    =");
+        end
+        $display("==============================================");
         $finish;
     end
 
@@ -224,7 +232,7 @@ module top;
         iexp  = $floor($ln(abs) / $ln(2));
         ffrac  = abs / $pow(2,iexp);
         ffracd = abs / $pow(2,-P_BIAS);
-        $display("CINO myrealtobits: r = %2.30e, abs = %e, iexp = %0d, ffrac = %2.20e, ffracd = %2.20e",r, abs, iexp, ffrac, ffracd);
+//        $display("CINO myrealtobits: r = %2.30e, abs = %e, iexp = %0d, ffrac = %2.20e, ffracd = %2.20e",r, abs, iexp, ffrac, ffracd);
         if (iexp > -P_BIAS) begin
             // Normal case
             exp = (r==0) ? 0 : P_BIAS + iexp;
@@ -248,9 +256,9 @@ module top;
         end
 //        $display("CINO myrealtobits sign = %b, exp = %0h, ffrac = %0h",sign,exp,frac);
         if (r == 1.0/0.0)
-            myrealtobits = 1.0/0.0;
+            myrealtobits = {1'b0,{P_EXP{1'b1}},{P_FRAC{1'b0}}};
         else if (r == $ln(0.0))
-            myrealtobits = $ln(0.0);
+            myrealtobits = {1'b1,{P_EXP{1'b1}},{P_FRAC{1'b0}}};
         else
             myrealtobits = {sign, exp, frac};
 
