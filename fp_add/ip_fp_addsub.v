@@ -99,7 +99,7 @@ module ip_fp_addsub
     assign ls_exp = l_exp - |l_exp - s_exp + |s_exp;
 
     // Decide if we use the close or the far path
-    assign c_path = eff_sub && ((l_exp == s_exp) || (ls_exp == 'd1));
+    assign c_path = eff_sub && ((ls_exp == 'd0) || (ls_exp == 'd1));
 
     //
     // Close Path
@@ -116,13 +116,13 @@ module ip_fp_addsub
     // Calculate how many 0s need to be canceled out
     assign c_lzc           = lzc(c_ls_frac);
     // Result is denormal?
-    assign c_denormal      = l_exp < c_lzc;
+    assign c_denormal      = l_exp <= c_lzc;
     // Cap the max shift
     assign c_lzc_cap       = c_denormal ? l_exp : c_lzc;
     // calculate Z exponent
     assign c_z_exp         = l_exp - c_lzc_cap;
     // Left shift by the correct amount
-    assign c_z_frac        = c_ls_frac << c_lzc;
+    assign c_z_frac        = c_denormal ? c_ls_frac << (l_exp-|l_exp): c_ls_frac << c_lzc;
     assign c_z_sticky      = 1'b0;
 
     //
@@ -153,16 +153,24 @@ module ip_fp_addsub
             end
             2'b01: begin
                 // Addition carry out is not set: no shift is required, normal case
-                f_z_exp    = l_exp;
+                f_z_exp    = l_exp == 0 ? 'd1 : l_exp;      // If it was denormal but now it is not any more exp = 1
                 f_z_frac   = {f_subadd_frac[P_PFRAC-1:0], f_g_bit};
                 f_z_sticky = f_r_bit || f_s_bit;
             end
             2'b00: begin
-                //It was Substraction that lead at one bit cancellation
-                // or result is denorm
-                f_z_exp    = l_exp - 1;
-                f_z_frac   = {f_subadd_frac[P_PFRAC-2:0], f_g_bit, f_r_bit};
-                f_z_sticky = f_s_bit;
+                if (eff_sub) begin
+                    //It was Substraction that lead at one bit cancellation
+                    // or result is denorm
+                    f_z_exp    = l_exp - 1;
+                    f_z_frac   = {f_subadd_frac[P_PFRAC-2:0], f_g_bit, f_r_bit};
+                    f_z_sticky = f_s_bit;
+                end
+                else begin
+                    // If it was not a sub then it must have been denorm since the begging so don't touch it
+                    f_z_exp    = l_exp;
+                    f_z_frac   = {f_subadd_frac[P_PFRAC-1:0], f_g_bit};
+                    f_z_sticky = f_r_bit || f_s_bit;
+                end
             end
         endcase
     end
