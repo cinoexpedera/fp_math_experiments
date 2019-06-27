@@ -15,6 +15,8 @@ module top;
     integer             cnt_in;
 
     reg [P_SIZE-1:0]    a,b,c;
+    wire [P_SIZE-1:0]   sum;
+    wire [P_SIZE-1:0]   exp_sum;
     wire [P_SIZE-1:0]   out0, out1;
     reg                 fail;
 
@@ -70,25 +72,12 @@ module top;
         rst = 0;
         repeat (5) @(posedge clk);
 
-        for (i = 0; i < transaction; i++) begin
-            a = $urandom();
-            b = $urandom();
-            c = $urandom();
+        start_push = 1;
+        while ((cnt_in < transaction) && (timeout < 100)) begin
             @(posedge clk);
-            // if (z == myrealtobits(k)) begin
-            //     $display("%t sample %d OK it match: a = 0x%0h:%2.20e; b = 0x%0h:%2.20e; z = 0x%0h:%2.20e, expt = 0x%0h:%2.20e",$time,i,a,x,b,y,z,mybitstoreal(z),myrealtobits(k),k);
-            // end
-            // else begin
-            //     $display("%t sample %d ERROR they don't match: a = 0x%0h:%2.20e; b = 0x%0h:%2.20e; z = 0x%0h:%2.20e, expt = 0x%0h:%2.20e",$time,i,a,x,b,y,z,mybitstoreal(z),myrealtobits(k),k);
-            //     fail = 1'b1;
-            // end
+            // timeout = (x_vld || y_vld) ? 0 : timeout + 1;
         end
-        // start_push = 1;
-        // while ((cnt_in < transaction) && (timeout < 100)) begin
-        //     @(posedge clk);
-        //     timeout = (x_vld || y_vld) ? 0 : timeout + 1;
-        // end
-
+        done = 1;
         repeat (500) @(posedge clk);
         $display("==============================================");
         if (fail) begin
@@ -101,6 +90,14 @@ module top;
         $finish;
     end
 
+    always @(posedge clk) begin
+        if (start_push && (cnt_in < transaction)) begin
+            a = $urandom();
+            b = $urandom();
+            c = $urandom();
+        end
+    end
+
     ip_tree #(.P_SIZE(P_SIZE))
                 ip_tree(.a,
                         .b,
@@ -108,6 +105,25 @@ module top;
                         .out0,
                         .out1);
 
+    assign sum = out0 + (out1 << 1);
+    assign exp_sum = a + b + c;
 
+    always @(posedge clk) begin
+        #1;
+        if (start_push) begin
+            cnt_in <= cnt_in + 1;
+            if (!done) begin
+                if (sum == exp_sum) begin
+                    $display("%t OK sum match sum = %0d, a + b + c = %0d", $time, sum, exp_sum);
+                end
+                else begin
+                    $display("%t ERROR sum doesnt' match sum = %0d, a + b + c = %0d", $time, sum, exp_sum);
+                    fail <= 1;
+                    #10;
+                    $finish;
+                end
+            end
+        end
+    end
 
 endmodule
